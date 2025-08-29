@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>คำนวณตารางวัคซีนเด็ก</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- jsPDF + AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+
+  <div class="w-full max-w-lg bg-white shadow-lg rounded-2xl p-6">
+    <h2 class="text-2xl font-bold text-center text-blue-600 mb-6">ตารางวัคซีนเด็ก</h2>
+
+    <!-- Input -->
+    <div class="flex flex-col gap-4">
+      <div class="flex flex-col">
+        <label for="birthdate" class="text-lg font-medium mb-1">เลือกวันเกิด:</label>
+        <input type="date" id="birthdate"
+          class="border border-gray-300 rounded-lg p-3 text-lg focus:ring-2 focus:ring-blue-400">
+      </div>
+
+      <button onclick="calcSchedule()" 
+        class="bg-blue-500 text-white py-3 rounded-lg text-lg font-medium hover:bg-blue-600 transition">
+        คำนวณตารางวัคซีน
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="mt-6 overflow-x-auto">
+      <table id="resultTable" class="w-full border-collapse hidden text-sm sm:text-base">
+        <thead>
+          <tr class="bg-blue-100 text-gray-700">
+            <th class="border p-2">อายุ</th>
+            <th class="border p-2">ชื่อวัคซีน</th>
+            <th class="border p-2">วันที่ฉีด</th>
+          </tr>
+        </thead>
+        <tbody id="resultBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Export Button -->
+    <button id="exportBtn" onclick="exportPDF()" 
+      class="hidden mt-4 bg-green-500 text-white py-3 w-full rounded-lg text-lg font-medium hover:bg-green-600 transition">
+      บันทึกเป็น PDF
+    </button>
+  </div>
+
+  <script>
+    const vaccines = [
+      { age: "2 เดือน", months: 2, name: "DTP-HB-HIB + OPV + Rota เข็ม 1" },
+      { age: "4 เดือน", months: 4, name: "DTP-HB-HIB + OPV + Rota เข็ม 2 + IPV" },
+      { age: "6 เดือน", months: 6, name: "DTP-HB-HIB + OPV เข็ม 3" },
+      { age: "9 เดือน", months: 9, name: "MMR เข็ม 1" },
+      { age: "1 ปี", months: 12, name: "JE เข็ม 1" },
+      { age: "1 ปีครึ่ง", months: 18, name: "DTP + OPV เข็ม 1" },
+      { age: "2 ปีครึ่ง", months: 30, name: "JE + MMR เข็ม 1" },
+      { age: "4 ปี", months: 48, name: "DTP + OPV เข็ม 2" },
+    ];
+
+    function calcSchedule() {
+      const input = document.getElementById("birthdate").value;
+      if (!input) return alert("กรุณาเลือกวันเกิด");
+
+      const birthDate = new Date(input);
+
+      const tbody = document.getElementById("resultBody");
+      tbody.innerHTML = "";
+
+      vaccines.forEach(v => {
+        let date = new Date(birthDate);
+        date.setMonth(date.getMonth() + v.months);
+
+        const thaiDate = date.toLocaleDateString("th-TH", {
+          year: "numeric", month: "long", day: "numeric"
+        });
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-gray-50">
+            <td class="border p-2">${v.age}</td>
+            <td class="border p-2 text-left">${v.name}</td>
+            <td class="border p-2">${thaiDate}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById("resultTable").classList.remove("hidden");
+      document.getElementById("exportBtn").classList.remove("hidden");
+    }
+
+    async function exportPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // โหลดฟอนต์ Sarabun (base64) สำหรับภาษาไทย
+      const fontUrl = "https://cdn.jsdelivr.net/gh/google/fonts/ofl/sarabun/Sarabun-Regular.ttf";
+      const font = await fetch(fontUrl).then(res => res.arrayBuffer());
+      doc.addFileToVFS("Sarabun.ttf", btoa(String.fromCharCode(...new Uint8Array(font))));
+      doc.addFont("Sarabun.ttf", "Sarabun", "normal");
+      doc.setFont("Sarabun");
+
+      doc.setFontSize(16);
+      doc.text("ตารางวัคซีนเด็ก", 14, 15);
+
+      doc.autoTable({
+        startY: 25,
+        head: [['อายุ', 'ชื่อวัคซีน', 'วันที่ฉีด']],
+        body: Array.from(document.querySelectorAll("#resultBody tr")).map(row =>
+          Array.from(row.querySelectorAll("td")).map(td => td.innerText)
+        ),
+        styles: { font: "Sarabun", fontSize: 12 },
+      });
+
+      doc.save("ตารางวัคซีน.pdf");
+    }
+  </script>
+</body>
+</html>
