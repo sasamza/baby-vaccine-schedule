@@ -9,25 +9,39 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/th.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
 
   <div class="w-full bg-white shadow-lg rounded-2xl p-6">
-    <h2 class="text-2xl font-bold text-center text-blue-600 mb-6">ตารางวัคซีนเด็ก</h2>
+    <h2 class="text-xl font-bold mb-3">คำนวณกำหนดการฉีดวัคซีน</h2>
 
-    <!-- Input -->
     <div class="flex flex-col gap-4">
       <div class="flex flex-col">
-        <label for="birthdate" class="text-lg font-medium mb-1">เลือกวันเกิด:</label>
-        <input type="text" id="birthdate"
-  class="w-full border border-gray-300 rounded-lg p-3 text-lg focus:ring-2 focus:ring-blue-400 cursor-pointer"
-  placeholder="เลือกวันเกิด">
+      <!-- เลือกโหมด -->
+      <label class="block mb-2">เลือกประเภท</label>
+      <select id="mode" class="border rounded w-full p-2 mb-4">
+        <option value="normal">ปกติ (ตามวันเกิด)</option>
+        <option value="late1">ล่าช้า (1–6 ปี)</option>
+        <option value="late2">ล่าช้า (7 ปีขึ้นไป)</option>
+      </select>
+
+      <!-- วันเกิด -->
+      <div id="birthdateDiv" class="mb-4">
+        <label class="block mb-2">วันเดือนปีเกิด</label>
+        <input type="date" id="birthdate" class="border rounded w-full p-2">
       </div>
 
-      <button onclick="calcSchedule()" 
-        class="bg-blue-500 text-white py-3 rounded-lg text-lg font-medium hover:bg-blue-600 transition">
-        คำนวณตารางวัคซีน
-      </button>
+      <!-- วันที่เริ่มฉีด -->
+      <div id="startdateDiv" class="mb-4 hidden">
+        <label class="block mb-2">วันที่เริ่มฉีด</label>
+        <input type="date" id="startdate" class="border rounded w-full p-2">
+      </div>
+
+      <button onclick="generateSchedule()" class="bg-blue-500 text-white py-3 rounded-lg text-lg font-medium hover:bg-blue-600 transition">สร้างตาราง</button>
+      <div id="result" class="mt-6 overflow-x-auto"></div>
+    </div>
     </div>
 
     <!-- Table -->
@@ -35,7 +49,7 @@
       <table id="resultTable" class="w-full border-collapse hidden text-sm sm:text-base">
         <thead>
           <tr class="bg-blue-100 text-gray-700">
-            <th class="border p-2">อายุ</th>
+            <th class="border p-2">สำหรับอายุ</th>
             <th class="border p-2">ชื่อวัคซีน</th>
             <th class="border p-2">วันที่ฉีด</th>
           </tr>
@@ -55,54 +69,109 @@
     flatpickr("#birthdate", {
         dateFormat: "d/m/Y",
         locale: "th", // ภาษาไทย
-        allowInput: true
+        allowInput: true,
     });
-    const vaccines = [
-      { age: "2 เดือน", months: 2, name: "DTP-HB-HIB + OPV + Rota เข็ม 1" },
-      { age: "4 เดือน", months: 4, name: "DTP-HB-HIB + OPV + Rota เข็ม 2 + IPV" },
-      { age: "6 เดือน", months: 6, name: "DTP-HB-HIB + OPV เข็ม 3" },
-      { age: "9 เดือน", months: 9, name: "MMR เข็ม 1" },
-      { age: "1 ปี", months: 12, name: "JE เข็ม 1" },
-      { age: "1 ปีครึ่ง", months: 18, name: "DTP + OPV เข็ม 1" },
-      { age: "2 ปีครึ่ง", months: 30, name: "JE + MMR เข็ม 1" },
-      { age: "4 ปี", months: 48, name: "DTP + OPV เข็ม 2" },
-    ];
+    flatpickr("#startdate", {
+        dateFormat: "d/m/Y",
+        locale: "th", // ภาษาไทย
+        allowInput: true,
+    });
+    const schedules = {
+      normal: [
+        { age: "2 เดือน", vac: "DTP-HB-HIB+OPV+Rota เข็ม1", add: [2,"month"] },
+        { age: "4 เดือน", vac: "DTP-HB-HIB+OPV+Rota เข็ม2+IPV", add: [4,"month"] },
+        { age: "6 เดือน", vac: "DTP-HB-HIB+OPV เข็ม3", add: [6,"month"] },
+        { age: "9 เดือน", vac: "MMR เข็ม1", add: [9,"month"] },
+        { age: "1 ปี", vac: "JE เข็ม1", add: [12,"month"] },
+        { age: "1 ปีครึ่ง", vac: "DTP+OPV เข็ม1", add: [18,"month"] },
+        { age: "2 ปีครึ่ง", vac: "JE+MMR เข็ม1", add: [30,"month"] },
+        { age: "4 ปี", vac: "DTP+OPV เข็ม2", add: [48,"month"] }
+      ],
+      late1: [
+        { age: "0 เดือน", vac: "DTP-HB เข็ม1 + IPV / MMR เข็ม1 / BCG", add: [0,"month"] },
+        { age: "1 เดือน", vac: "DTP-HB เข็ม2 + OPV2 / JE1", add: [1,"month"] },
+        { age: "2 เดือน", vac: "MMR เข็ม2", add: [2,"month"] },
+        { age: "4 เดือน", vac: "DTP-HB เข็ม3 + OPV3", add: [4,"month"] },
+        { age: "12 เดือน", vac: "DTP4 + OPV4 / JE2", add: [12,"month"] }
+      ],
+      late2: [
+        { age: "0 เดือน", vac: "dT1 + OPV1 / MR/MMR / BCG", add: [0,"month"] },
+        { age: "1 เดือน", vac: "HB1 / JE1", add: [1,"month"] },
+        { age: "2 เดือน", vac: "dT2 + OPV2 / HB2", add: [2,"month"] },
+        { age: "7 เดือน", vac: "HB2", add: [7,"month"] },
+        { age: "12 เดือน", vac: "dT3 + OPV3 / JE2", add: [12,"month"] }
+      ]
+    };
 
-    function calcSchedule() {
-      const input = document.getElementById("birthdate").value;
-      if (!input) return alert("กรุณาเลือกวันเกิด");
+    function addMonths(date, months) {
+      let d = new Date(date);
+      d.setMonth(d.getMonth() + months);
+      return d;
+    }
+    function formatDateTH(d) {
+      return d.toLocaleDateString("th-TH", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+    }
 
-       const [d, m, y] = input.split("/");
-      const birthDate = new Date(Number(y) - 543, m - 1, d); // พ.ศ. -> ค.ศ.
+    function parseDate(input) {
+      const [day, month, year] = input.split("/").map(Number);
+      // JavaScript month index เริ่มที่ 0 → ม.ค. = 0, ก.ค. = 6
+      return new Date(year, month - 1, day);
+    }
 
-      if (isNaN(birthDate.getTime())) {
-        alert("วันที่ไม่ถูกต้อง");
+    function generateSchedule() {
+      const mode = document.getElementById("mode").value;
+      const birthdate = document.getElementById("birthdate").value;
+      const startdate = document.getElementById("startdate").value;
+
+      let baseDate = mode === "normal" ? birthdate : startdate;
+      console.log("Base Date:", baseDate, new Date(parseDate(baseDate)));
+      console.log("Mode:", mode);
+      if (!baseDate) {
+        alert("กรุณาเลือกวันให้ครบ");
         return;
       }
 
-      const tbody = document.getElementById("resultBody");
-      tbody.innerHTML = "";
+      const table = schedules[mode];
+      let html = `<h3 class="font-bold text-lg mb-2">ตารางวัคซีน (${mode})</h3>
+                  <table id="resultTable" class="w-full border-collapse text-sm sm:text-base">
+                    <thead>
+                      <tr class="bg-blue-100 text-gray-700">
+                        <th class="border p-2">อายุ</th>
+                        <th class="border p-2">วัคซีน</th>
+                        <th class="border p-2">วันที่ฉีด</th>
+                      </tr>
+                    </thead>
+                    <tbody id="resultBody">
+                      `;
 
-      vaccines.forEach(v => {
-        let date = new Date(birthDate);
-        date.setMonth(date.getMonth() + v.months);
-
-        const thaiDate = date.toLocaleDateString("th-TH", {
-          year: "numeric", month: "long", day: "numeric"
-        });
-
-        tbody.innerHTML += `
-          <tr class="hover:bg-gray-50">
-            <td class="border p-2">${v.age}</td>
-            <td class="border p-2 text-left">${v.name}</td>
-            <td class="border p-2">${thaiDate}</td>
-          </tr>
-        `;
+      table.forEach(row => {
+        let date = addMonths(new Date(parseDate(baseDate)), row.add[0]);
+        html += `<tr>
+          <td class="border p-2">${row.age}</td>
+          <td class="border p-2">${row.vac}</td>
+          <td class="border p-2">${formatDateTH(date)}</td>
+        </tr>`;
       });
 
-      document.getElementById("resultTable").classList.remove("hidden");
+      html += "</tbody></table>";
+      document.getElementById("result").innerHTML = html;
       document.getElementById("exportBtn").classList.remove("hidden");
     }
+
+    // ------------------------- สลับ input -------------------------
+    document.getElementById("mode").addEventListener("change", e => {
+      if (e.target.value === "normal") {
+        document.getElementById("birthdateDiv").classList.remove("hidden");
+        document.getElementById("startdateDiv").classList.add("hidden");
+      } else {
+        document.getElementById("birthdateDiv").classList.add("hidden");
+        document.getElementById("startdateDiv").classList.remove("hidden");
+      }
+    });
 
     async function exportPDF() {
         const { jsPDF } = window.jspdf;
@@ -120,7 +189,7 @@
 
         doc.autoTable({
         startY: 25,
-        head: [['อายุ', 'ชื่อวัคซีน', 'วันที่ฉีด']],
+        head: [['สำหรับอายุ', 'ชื่อวัคซีน', 'วันที่ฉีด']],
         body: Array.from(document.querySelectorAll("#resultBody tr")).map(row =>
             Array.from(row.querySelectorAll("td")).map(td => td.innerText)
         ),
